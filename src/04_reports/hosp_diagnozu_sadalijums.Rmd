@@ -1,0 +1,64 @@
+---
+title: "Biežāk sastopamie hospitalizāciju kodi"
+author: "Artis Luguzis"
+date: '2023-06-05'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+rm(list = ls())
+```
+
+```{r libs}
+library(tidyverse)
+library(readxl)
+```
+
+```{r data}
+load("data/proc/hosp_cohort_alive.RData")
+
+# sepses kodi
+codes <- list()
+# excel_sheets("taskfiles/derived/sepses_kodi_manual.xlsx")
+# [1] "READ"           "tiesie"         "netiesie"       "org_darb_trauc"
+codes$tiesie <- read_xlsx("taskfiles/derived/sepses_kodi_manual.xlsx", sheet = "tiesie")
+
+codes$netiesie <- read_xlsx("taskfiles/derived/sepses_kodi_manual.xlsx", sheet = "netiesie")
+
+codes$org_trauc <- read_xlsx("taskfiles/derived/sepses_kodi_manual.xlsx", sheet = "org_darb_trauc")
+
+# pievieno tipu
+codes$tiesie <- codes$tiesie %>% 
+  mutate(tips = "tiesie")
+
+codes$netiesie <- codes$netiesie %>% 
+  mutate(tips = "netiesie")
+
+codes$org_trauc <- codes$org_trauc %>% 
+  mutate(tips = "org_trauc")
+
+
+# sagatavo regex
+sepsis_codes <- codes %>%
+  map(~{select(., kods_atlasei, tips)}) %>% 
+  bind_rows() %>% 
+  mutate(kods = gsub("\\.", "", kods_atlasei)) %>% 
+  group_by(tips) %>% 
+  summarise(regex = paste(kods, collapse = "|")) %>% 
+  mutate(regex = gsub("\\.", "", regex))
+```
+
+```{r}
+tmp1 <- cohort %>% 
+  select(pid, eid, diag1, diag2) %>% 
+  mutate(diag2 = strsplit(diag2, ";")) %>% 
+  unnest(diag2) %>% 
+  drop_na(diag2)
+
+tmp2 <- tmp1 %>% 
+  pivot_longer(diag1:diag2, names_to = "diag_tips", values_to = "diag")
+```
+

@@ -1,0 +1,162 @@
+---
+title: "Sepses trendi"
+author: "Artis Luguzis"
+date: 
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r libs}
+library(tidyverse)
+library(gtsummary)
+library(readxl)
+```
+
+```{r formats}
+# hcru_stats <- 
+```
+
+
+```{r data}
+load(file = "data/proc/hosp_cohort_sepsis_all_w_comorb_1.RData")
+cohort1 <- cohort_comorb
+load(file = "data/proc/hosp_cohort_sepsis_all_w_comorb_2.RData")
+cohort2 <- cohort_comorb
+load(file = "data/proc/hosp_cohort_sepsis_all_w_comorb_3.RData")
+cohort3 <- cohort_comorb
+
+cohort_raw <- bind_rows(cohort1, cohort2, cohort3)
+```
+
+```{r data-proc}
+# definē mainīgos
+cohort <- cohort_raw %>%
+  mutate(gads = year(date1)) %>% 
+  mutate(case = 1) %>% 
+  mutate(vecums = as.integer(vecums_hospitalizacijas_bridi))
+
+
+# 1. gadījums gadā
+cohort <- cohort %>% 
+  group_by(gads, pid) %>% 
+  mutate(seq = seq_along(pid)) %>% 
+  mutate(case_1st = ifelse(seq == 1, 1, 0)) %>% 
+  ungroup()
+
+# uzņemšanu skaits gadā
+admission_counts <- cohort %>% 
+  group_by(gads, pid) %>% 
+  summarise(
+    count = n()
+  ) %>% 
+  ungroup()
+
+# sekojošas hospitalizācijas gada laikā
+readmission_counts <- cohort %>% 
+  group_by(pid) %>% 
+  mutate(next_hosp_within = as.integer(lead(date1) - date2)) %>% 
+  mutate(sepsis_hosp_1g = ifelse(next_hosp_within > 1 & next_hosp_within <= 365, 1, 0)) %>% 
+  mutate(sepsis_hosp_1g = ifelse(is.na(sepsis_hosp_1g), 0, sepsis_hosp_1g)) %>% 
+  ungroup()
+
+readmission_counts <- readmission_counts %>% 
+  group_by(gads, pid) %>% 
+  summarise(
+    sepsis_hosp_1g = sum(sepsis_hosp_1g) > 0
+  ) %>% 
+  ungroup()
+```
+
+
+## Incidence
+
+```{r}
+tmp1 <- cohort %>%
+  group_by(gads) %>% 
+  summarise(
+    cases = sum(case),
+    cases_1st = sum(case_1st)
+  ) %>% 
+  arrange(gads)
+
+tmp2 <- admission_counts %>% 
+  group_by(gads) %>% 
+  summarise(
+    admission_per_patient_median = median(count),
+    admission_per_patient_q1 = quantile(count, 0.25),
+    admission_per_patient_q3 = quantile(count, 0.75),
+    
+  ) %>% 
+  mutate(admission_count = paste0(admission_per_patient_median, " (", admission_per_patient_q1, ",", admission_per_patient_q3, ")")) %>% 
+  select(gads, admission_count) %>% 
+  arrange(gads)
+
+tmp3 <- readmission_counts %>% 
+  group_by(gads) %>% 
+  summarise(
+    sepsis_hosp_1g = round(mean(sepsis_hosp_1g)*100, 1)
+  ) %>%
+  arrange(gads) 
+  
+
+incidence <- bind_cols(tmp1, tmp2 %>% select(-gads), tmp3 %>% select(-gads))
+
+incidence <- incidence %>% 
+  t() %>% 
+  as.data.frame()
+
+gadi <- incidence[1, ] %>% as.character()
+
+incidence <- incidence[-1, ]
+
+colnames(incidence) <- gadi
+
+incidence %>%
+  knitr::kable()
+```
+
+## Baseline characteristics
+
+```{r}
+# cohort %>% glimpse()
+
+# as.numeric(cohort$stac_kartes_summa_bez_manipulacijam) %>% max()
+
+cohort %>% 
+  mutate(nave_hosp = stac_kustiba_izrakstisanas_kustiba == "33") %>% 
+  mutate(hosp_ilgums = as.integer(date2 - date1)) %>% 
+  mutate(across(mi:aids, ~{ifelse(. == "1", TRUE, FALSE)})) %>%
+  # mutate(across(contains("summa"), ~as.numeric(.))) %>% 
+  # mutate(across(contains("summa"), ~replace(., is.na(.), 0))) %>%
+  # mutate(costs = stac_kartes_summa_bez_manipulacijam + stac_kartes_summa_bez_pacienta_iemaksas + stac_kartes_summa_par_gadijumu + stac_kartes_summa_par_gultu_dienam) %>%
+   # + as.numeric(stac_kartes_summa_bez_pacienta_iemaksas) + as.numeric(stac_kartes_summa_par_gadijumu) + as.numeric(stac_kartes_summa_par_gultu_dienam)
+  mutate(vecuma_grupa = cut(vecums, seq(0, 120, by = 20))) %>% 
+  select(nave_hosp, hosp_ilgums, vecums,vecuma_grupa, dzimums, mi:aids, charlson, gads) %>% 
+  # View()
+  tbl_summary(
+    by = gads#,
+    # type = all_continuous() ~ "continuous2",
+    # statistic = all_continuous() ~ c(
+      # "{N_nonmiss}",
+      # "{mean} ({sd})",
+      # "{median} ({p25}, {p75})",
+      # "{p10}, {p90}",
+      # "{min} - {max}"
+    # )
+  ) %>% 
+  bold_labels() %>% 
+  as_kable()
+
+# cohort %>%
+#   filter(gads == 2015) %>% 
+#   select(contains("summa")) %>% 
+#   View()
+```
+
