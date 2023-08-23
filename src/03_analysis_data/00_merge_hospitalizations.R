@@ -17,7 +17,7 @@ stac <- readRDS("data/proc/clean_stac.rds")
 # stac <- stac0
 
 # -------------------------------------------------------------------------
-# Hospitalizāciju apvienošana
+# Apvienojamo hospializāciju noteikšana
 # -------------------------------------------------------------------------
 
 # Aprēķina starpības starp sekojošām hospitalizācijām
@@ -72,9 +72,10 @@ for (i in 2:nrow(stac_join)){ # 1. hospitalizāciju nevar pievienot
   # vai pagājis mazāk par 2 dienām
   boo2 <- stac_join$day_diff[i] < 2
 
-  if (boo1 & boo2) {
-    join_index[i] <- k
-     
+  if (all(boo1, boo2)) {   # ja abi izpildās, tad jāpievieno iepriekšējai hospitalizācijai
+    join_index[i] <- k # epizodes indekss
+    
+    # pārbauda, vai epizode turpinās 
     if (i < nrow(stac_join)){
       # epizode beidzās, ja:
       # - nākamais ir cits pid
@@ -82,17 +83,30 @@ for (i in 2:nrow(stac_join)){ # 1. hospitalizāciju nevar pievienot
       # - starpība līdz nākamajai hospitalizācijai ir lielāka par 1
       boo4 <- stac_join$day_diff[i + 1] > 1
       
-      if (boo3 | boo4) k <- k + 1 # nākamā epizode
+      if (any(boo3, boo4)) k <- k + 1 # nākamā epizode
     }
   }
   cat("\r")
   cat(round(i/nrow(stac_join)*100, 1), "%")
 }
 
+# pārbaude
+stac_join %>%
+  mutate(join_index = join_index) %>%
+  mutate(join_index_final = join_index_final) %>%
+  select(pid, date1, date2, day_diff, join_index, join_index_final) %>%
+  # drop_na(join_index_final) %>%
+  slice_head(n = 10)
+
 join_index_final <- map_int(1:nrow(stac_join), ~ifelse(!is.na(join_index[. + 1]), join_index[. + 1], join_index[.]))
 
 stac_join$join_index <- join_index_final
 
-stac_join %>% 
-  filter(!is.na(join_index)) %>% 
-  View()
+# stac_join %>% 
+#   filter(!is.na(join_index)) %>% 
+#   View()
+
+# -------------------------------------------------------------------------
+# Hospitalizāciju apvienošana
+# -------------------------------------------------------------------------
+
