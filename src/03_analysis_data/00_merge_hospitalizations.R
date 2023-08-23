@@ -64,16 +64,14 @@ boo2 <- FALSE
 # pirms pārbaudes aizstāj NA starpības ar 999999
 stac_join$day_diff <- replace_na(stac_join$day_diff, 999999)
 
-for (i in 1:nrow(stac_join)){ # i <- 2
+for (i in 2:nrow(stac_join)){ # 1. hospitalizāciju nevar pievienot
   
-  if (i > 1){
-    # vai iepriekšējais pid ir tāds pats
-    boo1 <- (stac_join$pid[i] == stac_join$pid[i - 1]) 
-    
-    # vai pagājis mazāk par 2 dienām
-    boo2 <- stac_join$day_diff[i] < 2
-  }
+  # vai iepriekšējais pid ir tāds pats
+  boo1 <- (stac_join$pid[i] == stac_join$pid[i - 1]) 
   
+  # vai pagājis mazāk par 2 dienām
+  boo2 <- stac_join$day_diff[i] < 2
+
   if (boo1 & boo2) {
     join_index[i] <- k
      
