@@ -77,11 +77,21 @@ data_full <- janitor::clean_names(data_full)
 # pārsauc kolonnas
 stac <- data_full %>%
   rename(
-    stac_epizodes_id = stac_epizodes_id,
     date1 = stac_kustiba_hospitalizacijas_datums,
     date2 = stac_kustiba_izrakstisanas_datums,
     diag1 = stac_pamatdiagnozes_kods,
-    diag2 = stac_papild_diagnozes_kods
+    diag2 = stac_papild_diagnozes_kods,
+    aik = stac_aik,
+    iest_kust = stac_kustiba_iestasanas_kustiba,
+    izrakst_kust = stac_kustiba_izrakstisanas_kustiba,
+    gpf = stac_gpf,
+    summa_bez_manip = stac_kartes_summa_bez_manipulacijam,
+    summa_bez_pac_iem = stac_kartes_summa_bez_pacienta_iemaksas,
+    summa_par_gadijumu = stac_kartes_summa_par_gadijumu,
+    summa_par_gultu_dienam = stac_kartes_summa_par_gultu_dienam,
+    nomesco_manip_kods = stac_nomesco_manip_kods,
+    manip_kods = stac_manip_kods,
+    vecums = vecums_hospitalizacijas_bridi 
   )
 
 # nrow(stac)
@@ -180,16 +190,16 @@ nrow(distinct(stac_unique, eid3))
 
 
 # Sakārto datu tipus ------------------------------------------------------
-
+glimpse(stac_unique)
 # simbolu mainīgie
 char_cols <- c("file", "sheet", "pid", "stac_personas_atvk", "stac_epizodes_id", "stac_ud_nr",
-               "diag1", "diag2", "stac_aik", "stac_kustiba_iestasanas_kustiba", "stac_kustiba_izrakstisanas_kustiba",
-               "stac_gpf", "stac_nomesco_manip_kods", "stac_manip_kods", "dzimums", "source_full", "eid1", "eid2", "eid3")
+               "diag1", "diag2", "aik", "iest_kust", "izrakst_kust",
+               "gpf", "nomesco_manip_kods", "manip_kods", "dzimums", "source_full", "eid1", "eid2", "eid3")
 
 # skaitliskie mainīgie
-num_cols <- c("stac_kartes_summa_bez_manipulacijam", "stac_kartes_summa_bez_pacienta_iemaksas",
-              "stac_kartes_summa_par_gadijumu", "stac_kartes_summa_par_gultu_dienam",
-              "vecums_hospitalizacijas_bridi", "dzimsanas_gads", "n_eid3", "len_diag")
+num_cols <- c("summa_bez_manip", "summa_bez_pac_iem",
+              "summa_par_gadijumu", "summa_par_gultu_dienam",
+              "vecums", "dzimsanas_gads", "n_eid3", "len_diag")
 
 # datumu mainīgie
 date_cols <- c("date1", "date2")
