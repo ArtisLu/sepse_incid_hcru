@@ -12,7 +12,7 @@ library(tidyverse)
 # -------------------------------------------------------------------------
 
 # visa datubāze
-stac <- readRDS("data/proc/clean_stac.rds")
+load(file = "data/02_cleaned/clean_stac.RData")
 # stac0 <- stac
 # stac <- stac0
 
@@ -213,4 +213,4 @@ stac_merged <- bind_rows(
 # nrow(stac_merged) - nrow(stac)
 
 stac <- stac_merged
-save(stac, file = "data/proc/clean_stac_merged.RData")
+save(stac, file = "data/03_intermediate/clean_stac_merged.RData")
