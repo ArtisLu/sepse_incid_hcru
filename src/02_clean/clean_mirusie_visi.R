@@ -74,4 +74,4 @@ mirusie <- mirusie %>%
 
 # mirusie %>% distinct(pid)
 
-save(mirusie, file = "data/proc/clean_mirusie_visi.RData")
+save(mirusie, file = "data/cleaned/clean_mirusie_visi.RData")
