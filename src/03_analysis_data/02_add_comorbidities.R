@@ -9,13 +9,14 @@ rm(list = ls())
 gc()
 
 # Dati --------------------------------------------------------------------
-# kohorta
-load(file = "data/proc/hosp_cohort_alive.RData")
+# visu hospitalizāciju fails
+load(file = "data/03_intermediate/stac_sepsis_ind.RData")
+stac_merged <- stac
 
 # blakusslimībām
-stac <- readRDS(file = "data/proc/clean_stac.rds")
-load(file = "data/proc/clean_ambul_stac.RData")
-load(file = "data/proc/clean_komp_med_stac.RData")
+load(file = "data/02_cleaned/clean_stac.RData")
+load(file = "data/02_cleaned/clean_ambul_stac.RData")
+load(file = "data/02_cleaned/clean_komp_med_stac.RData")
 
 # Apstrāde ----------------------------------------------------------------
 
