@@ -13,7 +13,7 @@ rm(list = ls())
 # -------------------------------------------------------------------------
 
 # visa datubāze
-load("data/proc/clean_stac_merged.RData")
+load("data/03_intermediate/clean_stac_merged.RData")
 
 # -------------------------------------------------------------------------
 # Palīgfaili
@@ -110,4 +110,4 @@ stac <- stac %>%
 
 stac %>% count(implicit, explicit)
 
-save(stac, file = "data/proc/stac_sepsis_ind.RData")
+save(stac, file = "data/03_intermediate/stac_sepsis_ind.RData")
