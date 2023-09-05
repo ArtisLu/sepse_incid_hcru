@@ -7,9 +7,17 @@ library(readxl)
 
 rm(list = ls())
 
-# Dati --------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Dati
+# -------------------------------------------------------------------------
+
 # visa datubāze
-stac <- readRDS("data/proc/clean_stac.rds")
+load("data/proc/clean_stac_merged.RData")
+
+# -------------------------------------------------------------------------
+# Palīgfaili
+# -------------------------------------------------------------------------
 
 # sepses kodi
 codes <- list()
@@ -31,7 +39,6 @@ codes$netiesie <- codes$netiesie %>%
 codes$org_trauc <- codes$org_trauc %>% 
   mutate(tips = "org_trauc")
 
-
 # sagatavo regex
 sepsis_codes <- codes %>%
   map(~{select(., kods_atlasei, tips)}) %>% 
@@ -41,15 +48,18 @@ sepsis_codes <- codes %>%
   summarise(regex = paste(kods, collapse = "|")) %>% 
   mutate(regex = gsub("\\.", "", regex))
 
+
+# -------------------------------------------------------------------------
+# Atzīmē hospitalizācijas ar atlasītajiem kodiem
 # -------------------------------------------------------------------------
 
-t1 <- Sys.time()
-
+# izņem "." no ICD koda
 stac <- stac %>% 
   mutate(
-    across(contains("diag"), ~gsub("\\.", "", .)) # izņem "." no ICD koda
+    across(contains("diag"), ~gsub("\\.", "", .)) 
   )
 
+# atrod hospitalizācijas ar kodiem
 stac <- stac %>% 
   mutate(
     tiesie_d1 = grepl(pattern = sepsis_codes %>% filter(tips == "tiesie") %>% pull(regex), x = diag1),
@@ -59,8 +69,6 @@ stac <- stac %>%
     org_trauc_d1 = grepl(pattern = sepsis_codes %>% filter(tips == "org_trauc") %>% pull(regex), x = diag1),
     org_trauc_d2 = grepl(pattern = sepsis_codes %>% filter(tips == "org_trauc") %>% pull(regex), x = diag2)
   )
-t2 <- Sys.time()
-t2-t1
 
 stac <- stac %>% 
   mutate(
