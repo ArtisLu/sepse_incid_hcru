@@ -69,7 +69,10 @@ stac <- stac %>%
     org_trauc_d1 = grepl(pattern = sepsis_codes %>% filter(tips == "org_trauc") %>% pull(regex), x = diag1),
     org_trauc_d2 = grepl(pattern = sepsis_codes %>% filter(tips == "org_trauc") %>% pull(regex), x = diag2)
   )
+# ~ 20 sek
 
+
+# klasificē hospitalizācijas
 stac <- stac %>% 
   mutate(
     tiesie = tiesie_d1 | tiesie_d2,
@@ -77,35 +80,33 @@ stac <- stac %>%
     org_trauc = org_trauc_d1 | org_trauc_d2,
     explicit = tiesie,
     implicit = netiesie & org_trauc
-  ) %>% 
-  mutate(
-    date1 = as.Date(date1),
-    date2 = as.Date(date2)
   )
 
-# checks
+# pārbauda tiešos kodus
 stac %>% 
   count(explicit, tiesie_d1, tiesie_d2)
-
 # explicit tiesie_d1 tiesie_d2      n
 # <lgl>    <lgl>     <lgl>      <int>
-# 1 FALSE    FALSE     FALSE     599072
-# 2 TRUE     FALSE     TRUE        6806
-# 3 TRUE     TRUE      FALSE       2161
-# 4 TRUE     TRUE      TRUE         372
+# 1 FALSE    FALSE     FALSE     558475
+# 2 TRUE     FALSE     TRUE        6577
+# 3 TRUE     TRUE      FALSE       2060
+# 4 TRUE     TRUE      TRUE         443
+# OK
 
+# pārbauda netiešos kodus
 stac %>% 
   count(implicit, netiesie, org_trauc)
 
 # implicit netiesie org_trauc      n
 # <lgl>    <lgl>    <lgl>      <int>
-# 1 FALSE    FALSE    FALSE     324828
-# 2 FALSE    FALSE    TRUE       33624
-# 3 FALSE    TRUE     FALSE     236078
-# 4 TRUE     TRUE     TRUE       13881
+# 1 FALSE    FALSE    FALSE     290626
+# 2 FALSE    FALSE    TRUE       32553
+# 3 FALSE    TRUE     FALSE     230355
+# 4 TRUE     TRUE     TRUE       14021
 
+# atmet liekās kolonnas
 stac <- stac %>%
-  select(file:source_full, tiesie, netiesie, org_trauc, explicit, implicit)
+  select(-any_of(contains(c("_d1", "_d2"))))
 
 stac %>% count(implicit, explicit)
 
