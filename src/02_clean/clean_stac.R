@@ -223,7 +223,8 @@ stac_unique <- stac_unique %>%
 
 stac_unique %>% glimpse()
 
-stac_unique %>%
+stac <- stac_unique %>%
   select(file:source_full, eid = eid3) %>%
-  relocate(eid, .after = pid) %>%
-  saveRDS("data/cleaned/clean_stac.rds")
+  relocate(eid, .after = pid)
+
+save(stac, file = "data/02_cleaned/clean_stac.RData")

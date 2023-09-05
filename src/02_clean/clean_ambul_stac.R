@@ -84,5 +84,5 @@ ambul %>% count(is.na(id))
 # atmet atkārtojošās
 ambul <- ambul %>% distinct(id, .keep_all = TRUE)
 
-save(ambul, file = "data/cleaned/clean_ambul_stac.RData")
+save(ambul, file = "data/02_cleaned/clean_ambul_stac.RData")
 

@@ -90,4 +90,4 @@ all_contents$table %>%
 komp_med %>% distinct(.keep_all = TRUE)
 komp_med <- komp_med %>% distinct(across(-file), .keep_all = TRUE)
 
-save(komp_med, file = "data/cleaned/clean_komp_med_stac.RData")
+save(komp_med, file = "data/02_cleaned/clean_komp_med_stac.RData")
