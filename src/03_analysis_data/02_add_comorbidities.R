@@ -8,7 +8,11 @@ library(comorbidity)
 rm(list = ls())
 gc()
 
-# Dati --------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Dati
+# -------------------------------------------------------------------------
+
 # visu hospitalizāciju fails
 load(file = "data/03_intermediate/stac_sepsis_ind.RData")
 stac_merged <- stac
@@ -18,7 +22,10 @@ load(file = "data/02_cleaned/clean_stac.RData")
 load(file = "data/02_cleaned/clean_ambul_stac.RData")
 load(file = "data/02_cleaned/clean_komp_med_stac.RData")
 
-# Apstrāde ----------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Apstrāde 
+# -------------------------------------------------------------------------
 
 # atlasa kolonnas
 stac_bs <- stac %>% 
@@ -44,18 +51,36 @@ rm(stac)
 rm(komp_med)
 gc()
 
-# pārveido datumus
+# pievieno avotu
 stac_bs <- stac_bs %>% 
-  mutate(across(contains("date"), ~lubridate::as_date(.))) %>% 
   mutate(source = "stac")
 
 ambul_bs <- ambul_bs %>% 
-  mutate(across(contains("date"), ~lubridate::as_date(.))) %>% 
   mutate(source = "ambul")
 
 komp_med_bs <- komp_med_bs %>% 
-  mutate(across(contains("date"), ~lubridate::as_date(.))) %>% 
   mutate(source = "komp_med")
+
+
+# pārveido datumus
+unique_datetimes <- bind_rows(
+  ambul_bs %>% select(date),
+  komp_med_bs %>% select(date)
+) %>% 
+  distinct() %>% 
+  rename(date_time = date) %>% 
+  mutate(date = lubridate::as_date(date_time))
+
+# pievieno datumus
+ambul_bs <- ambul_bs %>% 
+  left_join(unique_datetimes, by = c("date" = "date_time")) %>% 
+  mutate(date = date.y) %>% 
+  select(-date.y)
+
+komp_med_bs <- komp_med_bs %>% 
+  left_join(unique_datetimes, by = c("date" = "date_time")) %>% 
+  mutate(date = date.y) %>% 
+  select(-date.y)
 
 bs <- bind_rows(stac_bs, ambul_bs, komp_med_bs) %>% 
   select(source, everything())
@@ -68,26 +93,38 @@ bs <- bs %>%
   mutate(diag = strsplit(diag, ";")) %>% 
   unnest(diag)
 
-bs <- bs %>% 
+# atstāj unikālos ierakstus pēc pid, datuma un diagnozes
+bs_unique <- bs %>%
+  distinct(pid, date, diag)
+
+# izņem punktu no ICD-10 koda
+bs_unique <- bs %>% 
   mutate(diag = gsub("\\.", "", diag))
 
 # sakārto kohortu augošā secībā
-cohort <- cohort %>% 
+stac_merged <- stac_merged %>% 
   arrange(pid, date1)
 
-pids <- unique(cohort$pid)
 
-cohort_comorb <- list()
+# -------------------------------------------------------------------------
+# Blakusslimības sepses hospitalizācijām
+# -------------------------------------------------------------------------
+stac_sepsis <- stac_merged %>% 
+  filter(implicit | explicit)
+
+pids <- unique(stac_sepsis$pid)
+
+sepsis_comorb <- list()
 
 n <- length(pids)
 
 t1 <- Sys.time()
 for (i in 1:n){ # i <- 9479
   # atlasa visas hospitalizācijas
-  tmp <- cohort %>%
+  tmp <- stac_sepsis %>%
     filter(pid == pids[i])
   # atlasa visus diagnožu ierakstus
-  tmp_diag <- bs %>% filter(pid == pids[i])
+  tmp_diag <- bs_unique %>% filter(pid == pids[i])
   
   tmp_comorb <- list()
   for (j in 1:nrow(tmp)){ # j <- 1
@@ -108,7 +145,7 @@ for (i in 1:n){ # i <- 9479
   out <- bind_cols(tmp, bind_rows(tmp_comorb)[, -1])
   out$charlson <- charlson
   out$charlson_quan <- charlson_quan
-  cohort_comorb[[i]] <- out
+  sepsis_comorb[[i]] <- out
   cat("\r")
   cat(round(i/n*100, 2), "% done!")
 }
@@ -116,7 +153,7 @@ t2 <- Sys.time()
 
 t2 - t1
 
-cohort_comorb <- bind_rows(cohort_comorb)
+sepsis_comorb <- bind_rows(sepsis_comorb)
+sepsis_hosp <- sepsis_comorb
 
-cohort_comorb %>% View()
-save(cohort_comorb, file = "data/proc/hosp_cohort_alive_w_comorb.RData")
+save(sepsis_hosp, file = "data/03_intermediate/sepsis_hosp_w_comorb.RData")
