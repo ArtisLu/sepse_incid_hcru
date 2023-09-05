@@ -7,7 +7,7 @@ library(tidyverse)
 rm(list = ls())
 
 # Dati --------------------------------------------------------------------
-load("data/proc/stac_sepsis_ind.RData")
+load("data/03_intermediate/stac_sepsis_ind.RData")
 
 # Apstrāde ----------------------------------------------------------------
 
@@ -20,7 +20,7 @@ tmp1 <- stac %>%
 
 # distinct(tmp1, eid)
 
-# atlasa hospitalizācijas pacientiem, ka nav bijis sepsis
+# atlasa hospitalizācijas pacientiem, kam nav bijis sepsis
 tmp2 <- stac %>% 
   filter(!(pid %in% tmp1$pid)) %>% 
   mutate(cohort = "control")
