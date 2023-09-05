@@ -156,4 +156,4 @@ t2 - t1
 sepsis_comorb <- bind_rows(sepsis_comorb)
 sepsis_hosp <- sepsis_comorb
 
-save(sepsis_hosp, file = "data/03_intermediate/sepsis_hosp_w_comorb.RData")
+save(sepsis_hosp, file = "data/04_analysis_data/sepsis_hosp_w_comorb.RData")
