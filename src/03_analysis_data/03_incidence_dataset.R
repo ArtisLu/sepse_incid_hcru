@@ -92,6 +92,11 @@ hosp_descr <- hosp_descr %>%
 hosp_descr <- hosp_descr %>% 
   mutate(nave = ifelse(izrakst_kust == "33", 1, 0))
 
+# hospitalizācijas izmaksas (pēc formulas no Jura piemēra, epasts 2023-04-13)
+hosp_descr <- hosp_descr %>% 
+  mutate(summa = ifelse(summa_par_gadijumu == 0, summa_bez_pac_iem, summa_par_gadijumu)) %>% 
+  select(-all_of(contains("summa_")))
+
 save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
 
 #--------------------------------------------------------------------
