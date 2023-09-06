@@ -97,6 +97,10 @@ hosp_descr <- hosp_descr %>%
   mutate(summa = ifelse(summa_par_gadijumu == 0, summa_bez_pac_iem, summa_par_gadijumu)) %>% 
   select(-all_of(contains("summa_")))
 
+# atmet liekās kolonnas
+hosp_descr <- hosp_descr %>% 
+  select(-pid, -eid, -charlson, diag1, date1, date2, izrakst_kust, seq)
+
 save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
 
 #--------------------------------------------------------------------
