@@ -1,0 +1,253 @@
+---
+title: "Sepsis HCRU"
+author: "Artis Luguzis"
+date: 
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r libs}
+library(tidyverse)
+library(gtsummary)
+library(readxl)
+```
+
+
+```{r data}
+# kohorta
+load(file = "data/proc/hosp_cohort_matched.RData")
+
+# HCRU
+load("data/proc/clean_mirusie_hosp_sepsis.RData") # mirušie
+load("data/proc/clean_komp_med_stac.RData") # kompensējamie medikamenti
+load("data/proc/clean_ambul_stac.RData") # ambulatorās epizodes
+stac <- readRDS(file = "data/proc/clean_stac.rds") # hospitalizācijas
+
+# specialistu kodi
+spec_codes <- read_xlsx("taskfiles/raw/AM_specialitasu_klasifikators_LP_JB.xlsx") %>% 
+  janitor::clean_names() %>% 
+  # glimpse()
+  filter(remove == 0) %>% 
+  select(-biezums_gada_2018, -lp, -remove) %>% 
+  pivot_longer(laboratory_diagnostics:rehabilitation, names_to = "tips", values_to = "ind") %>% 
+  # group_by(specialitates_kods) %>% 
+  # summarise(n = sum(ind, na.rm = TRUE)) %>% 
+  drop_na() %>%
+  # count(n) %>% 
+  select(spec_kods = specialitates_kods, tips)
+```
+
+```{r data-proc}
+# pievieno miršanas datumu
+cohort_matched <- cohort_matched %>% 
+  left_join(mirusie %>% select(pid, nave_date = date1))
+
+# cik ir mirušo
+# cohort_matched %>% count(!is.na(nave_date))
+
+# pārbauda, ka nāve visiem pēc izrakstīšanās
+# cohort_matched %>%
+#   count(nave_date > date2)
+
+# atstāj tikai tos, kas dzīvi izrakstoties
+cohort_matched <- cohort_matched %>% 
+  filter(nave_date > date2 | is.na(nave_date))
+
+# nosaka novēroto datumu (max 365 dienas pēc izrakstīšanas, neieskaitot)
+cohort_matched <- cohort_matched %>% 
+  mutate(obs_date = pmin(date2 + 365, nave_date, na.rm = TRUE)) %>% 
+  mutate(
+    cens = case_when(
+      is.na(nave_date) ~ 0,
+      obs_date == nave_date ~ 1,
+      TRUE ~ 0
+    )
+  ) %>% 
+  mutate(time = as.integer(obs_date - date2))
+
+# cohort_matched$time %>% summary()
+# hist(cohort_matched$time)
+
+## Medikamenti
+
+# atstāj tikai receptes, kas ir starp izrakstīšanos (ieskaitot un maks beigām)
+drugs <- komp_med %>% 
+  filter(pid %in% cohort_matched$pid) %>%
+  left_join(cohort_matched %>% select(pid, izrakst_date = date2, obs_date), by = "pid") %>%
+  filter(datums > izrakst_date & datums <= obs_date) %>% 
+  mutate(across(contains("summa"), ~as.numeric(gsub(",", ".", .)))) %>% 
+  mutate(across(contains("lidzmaksajums"), ~as.numeric(gsub(",", ".", .))))
+
+# check
+# sum(unique(drugs$pid) %in% cohort_matched$pid)
+# length(unique(drugs$pid))
+
+## Ambulatorie
+visits <- ambul %>% 
+  filter(pid %in% cohort_matched$pid) %>%
+  left_join(cohort_matched %>% select(pid, izrakst_date = date2, obs_date), by = "pid") %>%
+  filter(sakuma_datums > izrakst_date & sakuma_datums <= obs_date) %>% 
+  rename(spec_kods = ap_specialitate)
+
+# pievieno speciālista tipu
+visits <- visits %>% 
+  left_join(spec_codes) %>% 
+  drop_na(tips)
+
+## Hospitalizācijas
+hosp <- stac %>% 
+  filter(pid %in% cohort_matched$pid) %>%
+  left_join(cohort_matched %>% select(pid, izrakst_date = date2, obs_date), by = "pid") %>%
+  filter(date1 > izrakst_date & date1 <= obs_date)
+```
+
+```{r}
+cohort_matched %>% 
+  mutate(nave = ifelse(cens == 1, TRUE, FALSE)) %>% 
+  mutate(hosp_ilgums = as.integer(date2 - date1)) %>% 
+  mutate(across(mi:aids, ~{ifelse(. == "1", TRUE, FALSE)})) %>% 
+  select(nave, fup_time = time, hosp_ilgums, vecums, dzimums, mi:aids, charlson, hosp_gads, cohort) %>% 
+  tbl_summary(
+    by = cohort,
+    type = all_continuous() ~ "continuous2",
+    statistic = all_continuous() ~ c(
+      # "{N_nonmiss}",
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})",
+      "{p10}, {p90}",
+      "{min} - {max}"
+    )
+  ) %>% 
+  bold_labels() %>% 
+  as_kable()
+```
+
+
+## Receptes
+
+```{r}
+drug_aggr <- drugs %>% 
+  group_by(pid) %>% 
+  summarise(
+    skaits = n(),
+    unique_atk = length(unique(atk_kods)),
+    summa_valsts = sum(valsts_summa),
+    summa_pac = sum(pacienta_lidzmaksajums),
+    summa_kopa = summa_valsts + summa_pac
+  )
+
+drug_aggr <- cohort_matched %>%
+  select(pid, cohort) %>% 
+  left_join(drug_aggr) %>% 
+  mutate(skaits = replace_na(skaits, 0))
+
+drug_aggr %>%
+  select(-pid) %>% 
+  mutate(any = skaits > 0) %>% 
+  select(any, everything()) %>% 
+  tbl_summary(
+    by = cohort,
+    type = all_continuous() ~ "continuous2",
+    statistic = all_continuous() ~ c(
+      "{N_nonmiss}",
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})",
+      "{p10}, {p90}",
+      "{min} - {max}"
+    ),
+    missing = "no"
+  ) %>%
+  bold_labels() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  as_kable()
+```
+
+## Ambulatorie pakalpojumi
+
+```{r}
+visits_aggr <- visits %>% 
+  mutate(across(contains("summa"), ~as.numeric(.))) %>% 
+  mutate(across(contains("iemaksa"), ~as.numeric(.))) %>% 
+  group_by(pid, tips) %>% 
+  summarise(
+    skaits = n(),
+    summa_epiz = sum(summa_epizodes, na.rm = TRUE),
+    summa_manip = sum(summa_manipulacijas, na.rm = TRUE),
+    summa_pac_iemaks_pac = sum(pacienta_iemaksa_no_pacienta, na.rm = TRUE),
+    summa_pac_iemaks_valsts = sum(pacienta_iemaksa_no_valsts, na.rm = TRUE),
+    summa_kopa = summa_epiz + summa_manip + summa_pac_iemaks_pac + summa_pac_iemaks_valsts
+  ) %>% 
+  ungroup()
+
+visits_aggr <- crossing(cohort_matched %>% select(pid, cohort), spec_codes %>% select(tips)) %>% 
+  left_join(visits_aggr) %>% 
+  mutate(skaits = replace_na(skaits, 0))
+
+tipi <- unique(visits_aggr$tips)
+
+visits_list <- map(
+  tipi,
+  ~{
+    tips_i <- .# tips_i <- tipi[5]
+    visits_aggr %>% 
+      filter(tips == tips_i) %>% 
+      select(-pid, -tips) %>%
+      mutate(any = skaits > 0) %>%
+      select(any, everything()) %>%
+      tbl_summary(
+        by = cohort,
+        # type = everything() ~ "continuous2",
+        type = list(contains("any") ~ "categorical", contains("skaits") ~ "continuous2", contains("summa") ~ "continuous2"),
+        statistic = all_continuous() ~ c(
+          "{N_nonmiss}",
+          "{mean} ({sd})",
+          "{median} ({p25}, {p75})",
+          "{p10}, {p90}",
+          "{min} - {max}"
+        ),
+        missing = "no"
+      ) %>% 
+      add_p() %>% 
+      modify_caption(tips_i)
+  }
+)
+
+visits_list[[1]]
+
+visits_list[[2]]
+
+visits_list[[3]]
+
+visits_list[[4]]
+
+visits_list[[5]]
+
+visits_list[[6]]
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
