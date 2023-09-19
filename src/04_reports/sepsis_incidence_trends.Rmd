@@ -44,14 +44,14 @@ csp_iedz_gadi <- csp_iedz_gadi %>%
 
 # skaits pa gadiem
 iedz_skaits_pa_gadiem <- csp_iedz %>%
-  filter(between(as.integer(gads), 2013, 2020)) %>%
+  filter(between(as.integer(gads), 2015, 2020)) %>%
   group_by(gads) %>%
   summarise(skaits = sum(skaits)) %>%
   ungroup()
 
 # skaits pa gadiem un vecuma / dzimuma grupās
 iedz_skaits_pa_gadiem_grupas <- csp_iedz_gadi %>%
-  filter(between(as.integer(gads), 2013, 2020)) %>%
+  filter(between(as.integer(gads), 2015, 2020)) %>%
   mutate(vecums_cat = cut(vec, c(0, 20, 40, 60, 80, Inf), right = FALSE, labels = c("<20","20-39", "40-59", "60-79", "80+"))) %>% 
   group_by(gads, vecums_cat, dzimums) %>%
   summarise(skaits = sum(skaits)) %>% 
@@ -66,9 +66,9 @@ incidence <- hosp_descr %>%
   group_by(gads) %>% 
   summarise(incidence = n()) %>% 
   left_join(iedz_skaits_pa_gadiem) %>% 
-  mutate(incidence_100k = round(incidence/skaits * 10^5, 1))
+  mutate(incidence_100k = incidence/skaits * 10^5)
 
-# vecuma-dzimuma koriģētā (i.e., pēc iedzīvotāju sastāva 2014. gadā)
+# vecuma-dzimuma koriģētā (i.e., pēc iedzīvotāju sastāva 2015. gadā)
 incidence_by_groups <- hosp_descr %>% 
   group_by(gads, vecums_cat, dzimums) %>% 
   summarise(incidence = n()) %>%
@@ -76,9 +76,9 @@ incidence_by_groups <- hosp_descr %>%
   left_join(iedz_skaits_pa_gadiem_grupas %>% select(-skaits_prop)) %>% 
   mutate(incidence_100k = incidence/skaits * 10^5)
 
-# pievieno 2014. gada proporcijas
+# pievieno 2015. gada proporcijas
 incidence_adj <- incidence_by_groups %>% 
-  left_join(iedz_skaits_pa_gadiem_grupas %>% filter(gads == 2014), by = c("vecums_cat", "dzimums")) %>% 
+  left_join(iedz_skaits_pa_gadiem_grupas %>% filter(gads == 2015), by = c("vecums_cat", "dzimums")) %>% 
   mutate(weighted_inc = skaits_prop * incidence_100k) %>% 
   select(-gads.y) %>% 
   rename(gads = gads.x) %>% 
@@ -86,32 +86,79 @@ incidence_adj <- incidence_by_groups %>%
   summarise(incidence_100k_adj = round(sum(weighted_inc), 1))
 
 incidence_total <- incidence %>% 
-  left_join(incidence_adj)
+  left_join(incidence_adj) %>% 
+  mutate(across(where(is.numeric), ~round(., 1)))
 ```
 
 ```{r cfr}
 # case fatality
 case_fatality <- hosp_descr %>% 
   group_by(gads) %>% 
-  summarise(case_fatality = round(mean(nave), 2))
+  summarise(
+    in_hosp_deaths = sum(nave),
+    case_fatality = mean(nave)
+  )
 
-# # vecuma-dzimuma koriģētā (i.e., pēc iedzīvotāju sastāva 2014. gadā)
-# case_fatality_by_groups <- hosp_descr %>% 
-#   group_by(gads, vecums_cat, dzimums) %>% 
-#   summarise(case_fatality = mean(nave)) %>% 
-#   ungroup()
-# 
-# # pievieno 2014. gada proporcijas
-# case_fatality_adj <- case_fatality_by_groups %>% 
-#   left_join(iedz_skaits_pa_gadiem_grupas %>% filter(gads == 2014), by = c("vecums_cat", "dzimums")) %>% 
-#   mutate(weighted_cfr = skaits_prop * case_fatality) %>% 
-#   select(-gads.y) %>% 
-#   rename(gads = gads.x) %>% 
-#   group_by(gads) %>% 
-#   summarise(case_fatality_adj = sum(weighted_cfr))
-# 
-# incidence_total <- incidence %>% 
-#   left_join(incidence_adj)
+# vecuma-dzimuma koriģētā (i.e., pēc iedzīvotāju sastāva 2015. gadā)
+case_fatality_by_groups <- hosp_descr %>%
+  group_by(gads, vecums_cat, dzimums) %>%
+  summarise(
+    in_hosp_deaths = sum(nave),
+    case_fatality = mean(nave)
+  ) %>%
+  ungroup()
+
+# sepses gadījumu proporcija grupās pa gadiem
+incidence_by_groups <- incidence_by_groups %>% 
+  group_by(gads) %>% 
+  mutate(prop = incidence / sum(incidence)) %>% 
+  ungroup()
+
+# pievieno 2014. gada proporcijas
+case_fatality_adj <- case_fatality_by_groups %>%
+  left_join(
+    incidence_by_groups %>% filter(gads == 2015) %>% select(vecums_cat, dzimums, prop),
+    by = c("vecums_cat", "dzimums")
+  ) %>%
+  mutate(weighted_cfr = prop * case_fatality) %>%
+  group_by(gads) %>%
+  summarise(case_fatality_adj = sum(weighted_cfr))
+
+case_fatality_total <- case_fatality %>%
+  left_join(case_fatality_adj) %>% 
+  mutate(across(contains("case_"), ~round(. * 100, 1))) %>% 
+  rename(
+    `case_fatality_%` = case_fatality,
+    `case_fatality_adj_%` = case_fatality_adj
+  )
+```
+
+```{r mortality}
+# mirstība uz 100k
+mortality <- case_fatality %>% 
+  select(gads, in_hosp_deaths) %>% 
+  left_join(iedz_skaits_pa_gadiem) %>% 
+  mutate(mortality_100k = in_hosp_deaths / skaits * 10^5) %>% 
+  select(-skaits)
+
+# mirstība uz 100k vecuma-dzimuma koriģētā
+mortality_by_groups <- case_fatality_by_groups %>% 
+  select(gads, vecums_cat, dzimums, in_hosp_deaths) %>% 
+  left_join(iedz_skaits_pa_gadiem_grupas %>% select(-skaits_prop)) %>% 
+  mutate(mortality_100k = in_hosp_deaths / skaits * 10^5)
+
+# pievieno 2015. gada proporcijas
+mortality_adj <- mortality_by_groups %>% 
+  left_join(iedz_skaits_pa_gadiem_grupas %>% filter(gads == 2015), by = c("vecums_cat", "dzimums")) %>% 
+  mutate(weighted_mort = skaits_prop * mortality_100k) %>% 
+  select(-gads.y) %>% 
+  rename(gads = gads.x) %>% 
+  group_by(gads) %>% 
+  summarise(mortality_100k_adj = sum(weighted_mort))
+
+mortality_total <- mortality %>% 
+  left_join(mortality_adj) %>% 
+  mutate(across(where(is.numeric), ~round(., 1)))
 ```
 
 ```{r other-stats}
@@ -119,7 +166,7 @@ case_fatality <- hosp_descr %>%
 pirma_sepse <- hosp_descr %>% 
   group_by(gads) %>% 
   summarise(
-    first_sepsis_hosp = sum(pirma_sepse_gada)
+    incidence_1st_case = sum(pirma_sepse_gada)
   )
 
 # hospitalizāciju skaits katram pacientam
@@ -136,16 +183,17 @@ sepsis_hosp_skaits <- patient_descr %>%
 # pacienti ar atkārtotu hospitalizāciju
 readmission <- patient_descr %>% 
   group_by(gads) %>% 
-  summarise(readmission = round(mean(readmit_1g), 2))
+  summarise(`readmission_%` = round(mean(readmit_1g) * 100, 1))
 ```
 
 # Incidences trendi
 ```{r}
 incidence_trends <- incidence_total %>% 
   select(-skaits) %>% 
-  left_join(case_fatality) %>% 
-  left_join(pirma_sepse) %>% 
+  left_join(pirma_sepse) %>%
   left_join(sepsis_hosp_skaits) %>% 
+  left_join(case_fatality_total) %>% 
+  left_join(mortality_total) %>% 
   left_join(readmission)
 
 colnames_new <- incidence$gads
