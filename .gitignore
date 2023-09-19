@@ -2,6 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+.html
+.xlsx
 data
 taskfiles
 admin
