@@ -107,7 +107,7 @@ hosp_descr <- hosp_descr %>%
 
 # atmet 2013. gadu
 hosp_descr <- hosp_descr %>% 
-  filter(gads > 2013)
+  filter(gads > 2014)
 
 save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
 
