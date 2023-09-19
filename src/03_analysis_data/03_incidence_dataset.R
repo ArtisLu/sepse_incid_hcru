@@ -101,16 +101,6 @@ hosp_descr <- hosp_descr %>%
 hosp_descr <- hosp_descr %>% 
   mutate(vecums_cat = cut(vecums, c(0, 20, 40, 60, 80, Inf), right = FALSE, labels = c("<20","20-39", "40-59", "60-79", "80+")))
 
-# atmet liekās kolonnas
-hosp_descr <- hosp_descr %>% 
-  select(-eid, -charlson, -diag1, -date1, -date2, -izrakst_kust, -seq)
-
-# atmet 2013. gadu
-hosp_descr <- hosp_descr %>% 
-  filter(gads > 2014)
-
-save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
-
 #--------------------------------------------------------------------
 # Definē pacientu raksturojošos parametrus katrā gadā
 #--------------------------------------------------------------------
@@ -136,8 +126,6 @@ tmp <- tmp %>%
 patient_descr <- patient_descr %>% 
   left_join(tmp, by = c("pid", "gads"))
 
-save(patient_descr, file = "data/04_analysis_data/sepsis_patient_characteristics.RData")
-
 # https://cran.r-project.org/web/packages/comorbidity/comorbidity.pdf
 # The id variable as defined by the user;
 # • mi, for myocardial infarction;
@@ -160,5 +148,20 @@ save(patient_descr, file = "data/04_analysis_data/sepsis_patient_characteristics
 # • aids, for AIDS/HIV
 
 
+# -------------------------------------------------------------------------
+# Saglabā 
+# -------------------------------------------------------------------------
+
+# atmet liekās kolonnas
+hosp_descr <- hosp_descr %>% 
+  select(-pid, -eid, -charlson, -diag1, -date1, -date2, -izrakst_kust, -seq)
+
+# atmet 2013. gadu
+hosp_descr <- hosp_descr %>% 
+  filter(gads > 2014)
+
+save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
+
+save(patient_descr, file = "data/04_analysis_data/sepsis_patient_characteristics.RData")
 
 
