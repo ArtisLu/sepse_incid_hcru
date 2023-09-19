@@ -6,4 +6,10 @@
 .xlsx
 data
 taskfiles
+<<<<<<< HEAD
 admin
+=======
+admin
+.html
+.xlsx
+>>>>>>> 308f5acd360a330b7d690fc96082ac65b792c5a2
