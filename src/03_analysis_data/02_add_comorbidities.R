@@ -61,7 +61,6 @@ ambul_bs <- ambul_bs %>%
 komp_med_bs <- komp_med_bs %>% 
   mutate(source = "komp_med")
 
-
 # pārveido datumus
 unique_datetimes <- bind_rows(
   ambul_bs %>% select(date),
@@ -157,3 +156,59 @@ sepsis_comorb <- bind_rows(sepsis_comorb)
 sepsis_hosp <- sepsis_comorb
 
 save(sepsis_hosp, file = "data/03_intermediate/sepsis_hosp_w_comorb.RData")
+
+# -------------------------------------------------------------------------
+# Blakusslimības pārējām hospitalizācijām
+# -------------------------------------------------------------------------
+stac_other <- stac_merged %>% 
+  filter(!(implicit | explicit))
+
+# pārbaude
+# nrow(stac_other) + nrow(stac_sepsis) == nrow(stac_merged)
+# [1] TRUE
+
+pids <- unique(stac_other$pid)
+
+other_comorb <- list()
+
+n <- length(pids)
+
+t1 <- Sys.time()
+for (i in 1:n){ # i <- 9479
+  # atlasa visas hospitalizācijas
+  tmp <- stac_other %>%
+    filter(pid == pids[i])
+  # atlasa visus diagnožu ierakstus
+  tmp_diag <- bs_unique %>% filter(pid == pids[i])
+  
+  tmp_comorb <- list()
+  for (j in 1:nrow(tmp)){ # j <- 1
+    tmp_comorb[[j]] <- comorbidity(
+      x = tmp_diag %>% filter(date <= tmp$date1[j]),
+      id = "pid",
+      code = "diag",
+      map = "charlson_icd10_quan",
+      assign0 = TRUE
+    )
+  }
+  
+  # aprēķina indeksus
+  charlson <- map_int(tmp_comorb, ~as.integer(score(., weights = "charlson", assign0 = TRUE)))
+  charlson_quan <- map_int(tmp_comorb, ~as.integer(score(., weights = "quan", assign0 = TRUE)))
+  
+  # izvade
+  out <- bind_cols(tmp, bind_rows(tmp_comorb)[, -1])
+  out$charlson <- charlson
+  out$charlson_quan <- charlson_quan
+  other_comorb[[i]] <- out
+  cat("\r")
+  cat(round(i/n*100, 2), "% done!")
+}
+t2 <- Sys.time()
+
+t2 - t1
+
+other_comorb <- bind_rows(other_comorb)
+other_hosp <- other_comorb
+
+save(other_hosp, file = "data/03_intermediate/other_hosp_w_comorb.RData")
