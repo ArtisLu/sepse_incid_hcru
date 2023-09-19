@@ -156,8 +156,11 @@ patient_descr <- patient_descr %>%
 hosp_descr <- hosp_descr %>% 
   select(-pid, -eid, -charlson, -diag1, -date1, -date2, -izrakst_kust, -seq)
 
-# atmet 2013. gadu
+# sākot no 2015. gada
 hosp_descr <- hosp_descr %>% 
+  filter(gads > 2014)
+
+patient_descr <- patient_descr %>% 
   filter(gads > 2014)
 
 save(hosp_descr, file = "data/04_analysis_data/sepsis_hosp_characteristics.RData")
