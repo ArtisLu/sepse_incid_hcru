@@ -97,6 +97,11 @@ hosp_descr <- hosp_descr %>%
   mutate(summa = ifelse(summa_par_gadijumu == 0, summa_bez_pac_iem, summa_par_gadijumu)) %>% 
   select(-all_of(contains("summa_")))
 
+# papildus pacienta izmaksas (no 2015. gada 10 EUR par dienu, līdz 2015. gadam 14 EUR par dienu)
+hosp_descr  <- hosp_descr %>% 
+  mutate(summa_pac = ifelse(gads < 2015, 14 * hosp_ilgums, 10 * hosp_ilgums)) %>% 
+  mutate(summa_total = summa + summa_pac)
+
 # vecuma grupas
 hosp_descr <- hosp_descr %>% 
   mutate(vecums_cat = cut(vecums, c(0, 20, 40, 60, 80, Inf), right = FALSE, labels = c("<20","20-39", "40-59", "60-79", "80+")))
