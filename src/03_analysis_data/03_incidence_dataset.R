@@ -103,7 +103,7 @@ hosp_descr <- hosp_descr %>%
 
 # atmet liekās kolonnas
 hosp_descr <- hosp_descr %>% 
-  select(-pid, -eid, -charlson, -diag1, -date1, -date2, -izrakst_kust, -seq)
+  select(-eid, -charlson, -diag1, -date1, -date2, -izrakst_kust, -seq)
 
 # atmet 2013. gadu
 hosp_descr <- hosp_descr %>% 
