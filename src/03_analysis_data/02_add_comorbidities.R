@@ -128,7 +128,7 @@ for (i in 1:n){ # i <- 9479
   tmp_comorb <- list()
   for (j in 1:nrow(tmp)){ # j <- 1
     tmp_comorb[[j]] <- comorbidity(
-      x = tmp_diag %>% filter(date <= tmp$date1[j]),
+      x = tmp_diag %>% filter(date <= tmp$date1[j] & date >= (tmp$date1[j] - 365)), # gads pirms
       id = "pid",
       code = "diag",
       map = "charlson_icd10_quan",
@@ -184,7 +184,7 @@ for (i in 1:n){ # i <- 9479
   tmp_comorb <- list()
   for (j in 1:nrow(tmp)){ # j <- 1
     tmp_comorb[[j]] <- comorbidity(
-      x = tmp_diag %>% filter(date <= tmp$date1[j]),
+      x = tmp_diag %>% filter(date <= tmp$date1[j] & date >= (tmp$date1[j] - 365)), # gads pirms
       id = "pid",
       code = "diag",
       map = "charlson_icd10_quan",
