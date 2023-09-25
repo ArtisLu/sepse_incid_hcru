@@ -169,46 +169,58 @@ stac_other <- stac_merged %>%
 
 pids <- unique(stac_other$pid)
 
-other_comorb <- list()
+B <- 10 # split in 10 parts
 
-n <- length(pids)
+splits <- parallel::splitIndices(length(pids), B)
 
-t1 <- Sys.time()
-for (i in 1:n){ # i <- 9479
-  # atlasa visas hospitalizācijas
-  tmp <- stac_other %>%
-    filter(pid == pids[i])
-  # atlasa visus diagnožu ierakstus
-  tmp_diag <- bs_unique %>% filter(pid == pids[i])
+for (b in 1:B){ # b <- 2
   
-  tmp_comorb <- list()
-  for (j in 1:nrow(tmp)){ # j <- 1
-    tmp_comorb[[j]] <- comorbidity(
-      x = tmp_diag %>% filter(date <= tmp$date1[j] & date >= (tmp$date1[j] - 365)), # gads pirms
-      id = "pid",
-      code = "diag",
-      map = "charlson_icd10_quan",
-      assign0 = TRUE
-    )
+  # subset of pids
+  pids_b <- pids[splits[[b]]]
+  
+  other_comorb <- list()
+  
+  n <- length(pids_b)
+  
+  t1 <- Sys.time()
+  for (i in 1:n){ # i <- 9479
+    # atlasa visas hospitalizācijas
+    tmp <- stac_other %>%
+      filter(pid == pids_b[i])
+    # atlasa visus diagnožu ierakstus
+    tmp_diag <- bs_unique %>% filter(pid == pids_b[i])
+    
+    tmp_comorb <- list()
+    for (j in 1:nrow(tmp)){ # j <- 1
+      tmp_comorb[[j]] <- comorbidity(
+        x = tmp_diag %>% filter(date <= tmp$date1[j] & date >= (tmp$date1[j] - 365)), # gads pirms
+        id = "pid",
+        code = "diag",
+        map = "charlson_icd10_quan",
+        assign0 = TRUE
+      )
+    }
+    
+    # aprēķina indeksus
+    charlson <- map_int(tmp_comorb, ~as.integer(score(., weights = "charlson", assign0 = TRUE)))
+    charlson_quan <- map_int(tmp_comorb, ~as.integer(score(., weights = "quan", assign0 = TRUE)))
+    
+    # izvade
+    out <- bind_cols(tmp, bind_rows(tmp_comorb)[, -1])
+    out$charlson <- charlson
+    out$charlson_quan <- charlson_quan
+    other_comorb[[i]] <- out
+    cat("\r")
+    cat(round(i/n*100, 2), "% done! B=", b)
   }
+  t2 <- Sys.time()
   
-  # aprēķina indeksus
-  charlson <- map_int(tmp_comorb, ~as.integer(score(., weights = "charlson", assign0 = TRUE)))
-  charlson_quan <- map_int(tmp_comorb, ~as.integer(score(., weights = "quan", assign0 = TRUE)))
+  t2 - t1
   
-  # izvade
-  out <- bind_cols(tmp, bind_rows(tmp_comorb)[, -1])
-  out$charlson <- charlson
-  out$charlson_quan <- charlson_quan
-  other_comorb[[i]] <- out
-  cat("\r")
-  cat(round(i/n*100, 2), "% done!")
+  other_comorb <- bind_rows(other_comorb)
+  other_hosp <- other_comorb
+  
+  save(other_hosp, file = paste0("data/03_intermediate/other_hosp_w_comorb_b=", b, ".RData"))
 }
-t2 <- Sys.time()
 
-t2 - t1
 
-other_comorb <- bind_rows(other_comorb)
-other_hosp <- other_comorb
-
-save(other_hosp, file = "data/03_intermediate/other_hosp_w_comorb.RData")
