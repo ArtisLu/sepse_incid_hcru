@@ -187,6 +187,7 @@ readmission <- patient_descr %>%
 ```
 
 # Incidences trendi
+
 ```{r}
 incidence_trends <- incidence_total %>% 
   select(-skaits) %>% 
@@ -210,10 +211,13 @@ incidence_trends %>% knitr::kable()
 ```
 
 # Sepses hospitalizāciju raksturojums
+
 ```{r hosp_summary}
 hosp_descr %>% 
-  filter(gads != 2013) %>% 
-  tbl_summary(by = gads)
+  select(vecums, vecums_cat, everything()) %>% 
+  select(-pirma_sepse_gada, -nave) %>% 
+  tbl_summary(by = gads) %>% 
+  bold_labels()
 ```
 
 
