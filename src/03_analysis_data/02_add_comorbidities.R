@@ -220,7 +220,45 @@ for (b in 1:B){ # b <- 2
   other_comorb <- bind_rows(other_comorb)
   other_hosp <- other_comorb
   
-  save(other_hosp, file = paste0("data/03_intermediate/other_hosp_w_comorb_b=", b, ".RData"))
+  save(other_hosp, file = paste0("data/03_intermediate/other_hosp_tmp/other_hosp_w_comorb_b=", b, ".RData"))
 }
+
+# apvieno vienā failā pārējās hospitalizācijas
+other_hosp_files <- list.files("data/03_intermediate/other_hosp_tmp", full.names = TRUE)
+other_hosp_list <- map(
+  other_hosp_files, ~{
+    load(.)
+    return(other_hosp)
+  }
+)
+other_hosp <- bind_rows(other_hosp_list)
+save(other_hosp, file = "data/03_intermediate/other_hosp_w_comorb.RData")
+
+# ielasa sepses hospitalizācijas
+load("data/03_intermediate/sepsis_hosp_w_comorb.RData")
+
+# pārbaudes
+all_hosp <- bind_rows(sepsis_hosp, other_hosp)
+
+# tikai unikālas hospitalizācijas
+nrow(all_hosp) == length(unique(all_hosp$eid))
+
+# ir visas sākotējās hospitalizācijas
+length(intersect(stac_merged$eid, all_hosp$eid)) == nrow(stac_merged)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
