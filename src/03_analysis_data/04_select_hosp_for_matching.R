@@ -26,7 +26,6 @@ source_hosp <- all_hosp %>%
 nrow(source_hosp)
 # [1] 107323
 
-
 # 2. SOLIS: sadala sepses un pārējās hospitalizācijās
 sepsis_hosp <- source_hosp %>% filter(implicit | explicit)
 other_hosp <- source_hosp %>% filter(!(implicit | explicit))
@@ -35,13 +34,19 @@ other_hosp <- source_hosp %>% filter(!(implicit | explicit))
 nrow(sepsis_hosp) + nrow(other_hosp) == nrow(source_hosp)
 # [1] TRUE
 
-# 3. SOLIS: izslēdz hospitalizācijas, kas beidzas ar nāvi
-
-# pirms
 nrow(sepsis_hosp)
 # [1] 14476
 nrow(other_hosp)
 # [1] 92847
+
+# 3. SOLIS: izslēdz other sepsis hospitalizācijas no pacientiem, kam ir sepses hospitalizācija
+other_hosp <- other_hosp %>% 
+  filter(!(pid %in% sepsis_hosp$pid))
+
+nrow(other_hosp)
+# [1] 85914
+
+# 3. SOLIS: izslēdz hospitalizācijas, kas beidzas ar nāvi
 
 sepsis_hosp <- sepsis_hosp %>%
   filter(izrakst_kust != "33")
@@ -51,12 +56,12 @@ nrow(sepsis_hosp)
 other_hosp <- other_hosp %>%
   filter(izrakst_kust != "33")
 nrow(other_hosp)
-# [1] 87539
+# [1] 80866
 
 # 4. SOLIS: izslēdz hospitalizācijas > 90 naktīm
 # source_hosp %>% count(is.na(date1), is.na(date2))
 # `is.na(date1)` `is.na(date2)`      n
-#   1 FALSE          FALSE          130477
+#   1 FALSE          FALSE          107323
 
 sepsis_hosp <- sepsis_hosp %>% 
   filter(as.integer(date2 - date1) <= 90)
@@ -66,7 +71,7 @@ nrow(sepsis_hosp)
 other_hosp <- other_hosp %>%
   filter(as.integer(date2 - date1) <= 90)
 nrow(other_hosp)
-# [1] 87296
+# [1] 80657
 
 # 5. solis: sepses un kontroles hospitalizācijām atstāj tikai pirmo hospitalizāciju 
 sepsis_hosp <- sepsis_hosp %>% 
@@ -81,26 +86,30 @@ other_hosp <- other_hosp %>%
   distinct(pid, .keep_all = TRUE)
 
 nrow(other_hosp)
-# [1] 65683
+# [1] 61674
 
 # 6. solis: vismaz 365 dienas pēc izrakstīšanās datuma
-max_date <- as.Date("2020-12-31") - 365 # follow-up periods NEIEKĻAUJ izrakstīšanās datumu
+max_date <- as.Date("2020-12-31") - 364 # follow-up periods IEKĻAUJ izrakstīšanās datumu
 max_date
-# [1] "2020-01-01"
+# [1] "2020-01-02"
 
 sepsis_hosp <- sepsis_hosp %>% 
   filter(date2 <= max_date)
 nrow(sepsis_hosp)
-# [1] 7947
+# [1] 7948
 
 other_hosp <- other_hosp %>%
   filter(date2 <= max_date)
 nrow(other_hosp)
-# [1] 65482
+# [1] 61507
 
 # pārbaude, ka tikai unikāli pid
 length(unique(sepsis_hosp$pid)) == nrow(sepsis_hosp)
 length(unique(other_hosp$pid)) == nrow(other_hosp)
+
+length(c(unique(sepsis_hosp$pid), unique(other_hosp$pid))) == nrow(sepsis_hosp) + nrow(other_hosp)
+
+
 
 # 7. solis: apvieno vienā datu kopā
 
