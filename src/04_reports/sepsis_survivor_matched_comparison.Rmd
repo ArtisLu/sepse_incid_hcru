@@ -1,0 +1,105 @@
+---
+title: "Sepses un kontroles hospitalizāciju salīdzinājums"
+author: "Artis Luguzis"
+date: 
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+rm(list = ls())
+```
+
+```{r libs}
+library(tidyverse)
+library(gtsummary)
+library(survival)
+library(ggsurvfit)
+library(ggsci)
+```
+
+
+```{r data}
+# matched kohorta
+load(file = "data/04_analysis_data/survivor_matched_cohorts.RData")
+```
+
+# Sepses hospitalizāciju raksturojums
+
+```{r hosp_summary}
+survivor_cohort %>% 
+  rename(nave_365d = cens_nave) %>% 
+  rename(rehosp_365d = cens_rehosp) %>% 
+  select(-pid, -nave_date, -obs_date_nave, -time_nave, -first_rehosp_date, -obs_date_rehosp, -time_rehosp) %>% 
+  # select(vecums:aids, cohort) %>% 
+  mutate(cohort = fct_relevel(cohort, c("sepsis", "control"))) %>% 
+  mutate(across(mi:aids, ~ifelse(. == 0, FALSE, TRUE))) %>% 
+  # glimpse()
+  tbl_summary(by = cohort) %>% 
+  bold_labels() %>% 
+  add_p()
+```
+
+# Survival analysis
+
+## Nāve
+
+```{r}
+survivor_cohort <- survivor_cohort %>% 
+  mutate(cohort = str_to_title(cohort))
+
+g1 <- survfit2(Surv(time_nave, cens_nave) ~ cohort, data = survivor_cohort) %>% 
+  ggsurvfit(type = "risk") +
+  labs(
+    x = "Days from discharge",
+    y = "Cumulative risk"
+  ) + 
+  add_confidence_interval() +
+  add_risktable() +
+  add_quantile(y_value = 0.9, color = "gray50", linewidth = 0.75) +
+  add_quantile(y_value = 0.8, color = "blue", linewidth = 0.75) +
+  scale_y_continuous(label = scales::percent,
+                     breaks = seq(0, 1, by = 0.02),
+                     expand = c(0.015, 0)) +
+  scale_x_continuous(breaks = seq(0, 365, by = 30)) +
+  scale_color_nejm() +
+  theme(legend.position = c(0.1, 0.7)) +
+  ggtitle("Outcome: all-cause death")
+
+g1
+ggsave(filename = "outputs/figures/KM_death_365d.png", plot = g1, width = 20, height = 10, units = "cm")
+```
+
+## Rehospitalizācijas
+
+```{r}
+g2 <- survfit2(Surv(time_rehosp, cens_rehosp) ~ cohort, data = survivor_cohort) %>% 
+  ggsurvfit(type = "risk") +
+  labs(
+    x = "Days from discharge",
+    y = "Cumulative risk"
+  ) + 
+  add_confidence_interval() +
+  add_risktable() +
+  # add_quantile(y_value = 0.9, color = "gray50", linewidth = 0.75) +
+  # add_quantile(y_value = 0.8, color = "blue", linewidth = 0.75) +
+  # add_quantile(y_value = 0.6, color = "green", linewidth = 0.75)
+  scale_y_continuous(label = scales::percent,
+                     breaks = seq(0, 1, by = 0.1),
+                     expand = c(0.015, 0)) +
+  scale_x_continuous(breaks = seq(0, 365, by = 30)) +
+  scale_color_nejm() +
+  theme(legend.position = c(0.1, 0.7)) +
+  ggtitle("Outcome: re-hospitalization")
+
+g2
+ggsave(filename = "outputs/figures/KM_rehosp_365d.png", plot = g2, width = 20, height = 10, units = "cm")
+
+g <- ggpubr::ggarrange(g1, g2, ncol = 1)
+ggsave(filename = "outputs/figures/KM_rehosp_death_365d.png", plot = g, width = 20, height = 20, units = "cm")
+```
+
