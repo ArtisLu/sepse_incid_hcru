@@ -30,6 +30,12 @@ load(file = file.path("taskfiles", "derived", "csp_iedz.RData"))
 load(file = file.path("taskfiles", "derived", "csp_iedz_vecums_gados.RData"))
 ```
 
+```{r}
+hosp_descr <- hosp_descr %>% 
+  mutate(vecums_cat = cut(vecums, c(0, 40, 60, 80, Inf), right = FALSE, labels = c("18-39", "40-59", "60-79", "80+")))
+```
+
+
 ```{r csp_processing}
 # apstrādā datus
 csp_iedz <- csp_iedz %>% 
@@ -52,7 +58,7 @@ iedz_skaits_pa_gadiem <- csp_iedz %>%
 # skaits pa gadiem un vecuma / dzimuma grupās
 iedz_skaits_pa_gadiem_grupas <- csp_iedz_gadi %>%
   filter(between(as.integer(gads), 2015, 2020)) %>%
-  mutate(vecums_cat = cut(vec, c(0, 20, 40, 60, 80, Inf), right = FALSE, labels = c("<20","20-39", "40-59", "60-79", "80+"))) %>% 
+  mutate(vecums_cat = cut(vec, c(0, 40, 60, 80, Inf), right = FALSE, labels = c("18-39", "40-59", "60-79", "80+"))) %>%
   group_by(gads, vecums_cat, dzimums) %>%
   summarise(skaits = sum(skaits)) %>% 
   group_by(gads) %>% 
@@ -213,11 +219,56 @@ incidence_trends %>% knitr::kable()
 # Sepses hospitalizāciju raksturojums
 
 ```{r hosp_summary}
-hosp_descr %>% 
+out_tbl <- hosp_descr %>% 
   select(vecums, vecums_cat, everything()) %>% 
   select(-pirma_sepse_gada, -nave) %>% 
   tbl_summary(by = gads) %>% 
   bold_labels()
+
+out_tbl
+```
+
+# Trendu virziens
+
+```{r}
+# apvieno abas tabuls
+trend_df <- out_tbl %>% 
+  as_tibble() %>% 
+  janitor::clean_names()
+
+trend_df <- bind_rows(
+  incidence_trends %>% 
+    rownames_to_column(var = "characteristic"),
+  trend_df %>% 
+    rename_with(~gsub("x|_.*", "", .), -characteristic)
+) %>% 
+  as_tibble()
+
+# sagatavo datus regresijai
+trend_df <- trend_df %>% 
+  pivot_longer(-characteristic, names_to = "year", values_to = "value") %>% 
+  drop_na(value) %>%
+  mutate(value_num = gsub(" \\(.*", "", value)) %>% 
+  mutate(value_num = gsub(",", "", value_num)) %>% 
+  mutate(value_num = as.numeric(value_num)) %>%
+  mutate(year = as.numeric(year)) %>% 
+  select(characteristic, year, value_num) 
+  
+trend_df <- trend_df %>% 
+  group_by(characteristic) %>% 
+  nest() %>% 
+  ungroup() %>% 
+  mutate(fit = map(data, ~{lm(.$value_num ~ .$year, data = .)})) %>% 
+  mutate(tidy_fit = map(fit, broom::tidy)) %>% 
+  unnest(tidy_fit) %>% 
+  filter(grepl("year", term)) %>% 
+  select(characteristic, estimate, std.error, p.value) %>% 
+  mutate(sig_trend = ifelse(p.value < 0.05, "Y", "N")) %>% 
+  mutate(trend_direction = ifelse(estimate > 0, "Up", "Down")) %>% 
+  mutate(trend_direction = ifelse(p.value > 0.05, "Uncertain", trend_direction)) %>% 
+  mutate(across(is.numeric, ~sprintf("%.2f", .)))
+
+trend_df %>% knitr::kable()
 ```
 
 
