@@ -49,7 +49,7 @@ m.out <- cohort %>%
     method = "nearest", # optimal nestrādā
     distance = "glm", 
     ratio = 3, 
-    exact = c("hosp_gads", "hosp_ilgums"), 
+    exact = c("hosp_gads", "hosp_ilgums") 
     # caliper = c("hosp_ilgums" = 2) # exact matching ar +/-2 dienas hospitalizācijas ilgumam
   )
 
@@ -66,14 +66,12 @@ cohort_matched %>%
   count(cohort) %>% 
   mutate(prop = n/sum(n))
 
-# pārbauda, vai visiem ir 1:2 matching
+# pārbauda, vai visiem ir 1:3 matching
 cohort_matched %>% 
   count(subclass) %>% 
   count(n) %>%
   mutate(prop = nn/sum(nn))
-# Piezīme: 640 sepses hospitalizācijām tikai 1 kontrole (nevis 3)
-# Piezīme: 941 sepses hospitalizācijām tikai 2 kontrole (nevis 3)
-# 80% hospitalizācijām ir 3 match
+# 76% hospitalizācijām ir 3 match
 
 # pārbauda, vai exact matching nostrādājis pareizi
 cohort_matched %>% 
