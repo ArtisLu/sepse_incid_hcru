@@ -18,13 +18,24 @@ all_hosp <- bind_rows(other_hosp, sepsis_hosp)
 all_hosp %>% count(implicit, explicit, tiesie, netiesie, org_trauc)
 
 # 1. SOLIS: 1) >= 18 gadi 2) sepse vai infekcija / orgānu disfunkcija 3) 2015-2019 (source population)
+
+# vecums
 source_hosp <- all_hosp %>% 
-  filter(vecums >= 18) %>% 
-  filter(implicit | explicit | netiesie) %>% # sepsis + infekcijas
-  filter(year(date1) >= 2015 & year(date1) <= 2019)
+  filter(vecums >= 18)
+nrow(source_hosp)
+
+# sepsis + infekcijas
+source_hosp <- source_hosp %>% 
+  filter(implicit | explicit | netiesie)
+nrow(source_hosp)
+
+# gadi
+source_hosp <- source_hosp %>% 
+  filter(year(date1) >= 2015)
 
 nrow(source_hosp)
-# [1] 107323
+# sepsis skaits būs vienāds ar incidences datu kopas skaitu
+source_hosp %>% count(sepsis = implicit | explicit)
 
 # 2. SOLIS: sadala sepses un pārējās hospitalizācijās
 sepsis_hosp <- source_hosp %>% filter(implicit | explicit)
@@ -34,73 +45,132 @@ other_hosp <- source_hosp %>% filter(!(implicit | explicit))
 nrow(sepsis_hosp) + nrow(other_hosp) == nrow(source_hosp)
 # [1] TRUE
 
-nrow(sepsis_hosp)
+# Attrition:
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
+# [1] 17837
+remaining_other <- nrow(other_hosp)
+remaining_other
+# [1] 104874
+
+# 3. SOLIS: izslēdz hospitalizācijas, kam nav 365-day follow-up
+sepsis_hosp <- sepsis_hosp %>% 
+  filter(year(date1) <= 2019)
+
+other_hosp <- other_hosp %>% 
+  filter(year(date1) <= 2019)
+
+# Attrition:
+remaining_sepsis - nrow(sepsis_hosp) # excluded
+# [1] 3361
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
 # [1] 14476
-nrow(other_hosp)
+
+remaining_other - nrow(other_hosp) # excluded
+# [1] 12027
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 92847
 
-# 3. SOLIS: izslēdz other sepsis hospitalizācijas no pacientiem, kam ir sepses hospitalizācija
+# 4. SOLIS: izslēdz other sepsis hospitalizācijas no pacientiem, kam ir sepses hospitalizācija
 other_hosp <- other_hosp %>% 
   filter(!(pid %in% sepsis_hosp$pid))
 
-nrow(other_hosp)
+# Attrition:
+remaining_other - nrow(other_hosp) # excluded
+# [1] 6933
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 85914
 
-# 3. SOLIS: izslēdz hospitalizācijas, kas beidzas ar nāvi
+# 5. SOLIS: izslēdz hospitalizācijas, kas beidzas ar nāvi
 
 sepsis_hosp <- sepsis_hosp %>%
   filter(izrakst_kust != "33")
-nrow(sepsis_hosp)
-# [1] 8896
 
 other_hosp <- other_hosp %>%
   filter(izrakst_kust != "33")
-nrow(other_hosp)
+
+# Attrition:
+remaining_sepsis - nrow(sepsis_hosp) # excluded
+# [1] 5580
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
+# [1] 8896
+remaining_other - nrow(other_hosp) # excluded
+# 5048
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 80866
 
-# 4. SOLIS: izslēdz hospitalizācijas > 90 naktīm
+# 6. SOLIS: izslēdz hospitalizācijas > 90 naktīm
 # source_hosp %>% count(is.na(date1), is.na(date2))
 # `is.na(date1)` `is.na(date2)`      n
-#   1 FALSE          FALSE          107323
+#   1 FALSE          FALSE          122711
 
 sepsis_hosp <- sepsis_hosp %>% 
   filter(as.integer(date2 - date1) <= 90)
-nrow(sepsis_hosp)
-# [1] 8758
 
 other_hosp <- other_hosp %>%
   filter(as.integer(date2 - date1) <= 90)
-nrow(other_hosp)
+
+# Attrition:
+remaining_sepsis - nrow(sepsis_hosp) # excluded
+# [1] 138
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
+# [1] 8758
+
+remaining_other - nrow(other_hosp) # excluded
+# [1] 209
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 80657
 
-# 5. solis: sepses un kontroles hospitalizācijām atstāj tikai pirmo hospitalizāciju 
+# 6. solis: sepses un kontroles hospitalizācijām atstāj tikai pirmo hospitalizāciju 
 sepsis_hosp <- sepsis_hosp %>% 
   arrange(date1) %>% 
   distinct(pid, .keep_all = TRUE)
-
-nrow(sepsis_hosp)
-# [1] 8015
 
 other_hosp <- other_hosp %>% 
   arrange(date1) %>% 
   distinct(pid, .keep_all = TRUE)
 
-nrow(other_hosp)
+# Attrition:
+remaining_sepsis - nrow(sepsis_hosp) # excluded
+# [1] 743
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
+# [1] 8015
+
+remaining_other - nrow(other_hosp) # excluded
+# [1] 18983
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 61674
 
-# 6. solis: vismaz 365 dienas pēc izrakstīšanās datuma
+# 7. solis: vismaz 365 dienas pēc izrakstīšanās datuma
 max_date <- as.Date("2020-12-31") - 364 # follow-up periods IEKĻAUJ izrakstīšanās datumu
-max_date
 # [1] "2020-01-02"
 
 sepsis_hosp <- sepsis_hosp %>% 
   filter(date2 <= max_date)
-nrow(sepsis_hosp)
-# [1] 7948
 
 other_hosp <- other_hosp %>%
   filter(date2 <= max_date)
-nrow(other_hosp)
+
+# Attrition:
+remaining_sepsis - nrow(sepsis_hosp) # excluded
+# [1] 67
+remaining_sepsis <- nrow(sepsis_hosp)
+remaining_sepsis
+# [1] 7948
+
+remaining_other - nrow(other_hosp) # excluded
+# [1] 167
+remaining_other <- nrow(other_hosp)
+remaining_other
 # [1] 61507
 
 # pārbaude, ka tikai unikāli pid
@@ -109,9 +179,12 @@ length(unique(other_hosp$pid)) == nrow(other_hosp)
 
 length(c(unique(sepsis_hosp$pid), unique(other_hosp$pid))) == nrow(sepsis_hosp) + nrow(other_hosp)
 
+# check attrition
+104874 - (12027 + 6933 + 5048 + 209 + 18983 + 167)
+17837 - (3361 + 5580 + 138 + 743 + 67)
+# OK
 
-
-# 7. solis: apvieno vienā datu kopā
+# 8. solis: apvieno vienā datu kopā
 
 cohort <- bind_rows(
   sepsis_hosp %>% mutate(cohort = "sepsis"),
