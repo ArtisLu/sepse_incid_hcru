@@ -175,6 +175,10 @@ visits <- visits %>%
   left_join(spec_codes) %>% 
   drop_na(tips)
 
+# apvieno other manipulations un other diagnostics
+visits <- visits %>% 
+  mutate(tips = ifelse(tips %in% c("other_care_manipulations", "other_diagnostics"), "ohter_diagnostics_manipulations", tips))
+
 # apkopu pēc pid un tipa
 visits_aggr <- visits %>% 
   mutate(across(contains("summa"), ~as.numeric(.))) %>% 
@@ -207,9 +211,9 @@ cohort_analysis <- cohort_analysis %>% left_join(visits_aggr_wide)
 
 # Definē utilization intensity
 cohort_analysis <- cohort_analysis %>% 
-  mutate(utilization_intensity = hosp_ilgums + primary_care_physician_visits_skaits + specialists_visits_skaits +other_care_manipulations_skaits + other_diagnostics_skaits) %>% 
+  mutate(utilization_intensity = hosp_ilgums + primary_care_physician_visits_skaits + specialists_visits_skaits +ohter_diagnostics_manipulations_skaits) %>% 
   mutate(outpatient_skaits = utilization_intensity - hosp_ilgums) %>% 
-  mutate(outpatient_summa = primary_care_physician_visits_summa + specialists_visits_summa + other_care_manipulations_summa + other_diagnostics_summa)
+  mutate(outpatient_summa = primary_care_physician_visits_summa + specialists_visits_summa + ohter_diagnostics_manipulations_summa)
 
 # Receptes ----------------------------------------------------------------
 drugs <- komp_med %>% 
@@ -243,10 +247,10 @@ survivor_cohort <- cohort_analysis %>%
          mi:aids, izrakst_gads, pamat_diag_grupa, nave_date:time_nave, first_rehosp_date, obs_date_rehosp:time_rehosp,
          nb_hospitalizations, hospital_nights, 
          primary_care_physician_visits_skaits, specialists_visits_skaits, laboratory_diagnostics_skaits, 
-         other_diagnostics_skaits, other_care_manipulations_skaits,
+         ohter_diagnostics_manipulations_skaits,
          receptes_skaits, utilization_intensity, outpatient_skaits,
          rehosp_summa, outpatient_summa, primary_care_physician_visits_summa, specialists_visits_summa,
-         laboratory_diagnostics_summa, other_diagnostics_summa, other_care_manipulations_summa,
+         laboratory_diagnostics_summa, ohter_diagnostics_manipulations_summa,
          receptes_summa, cohort)
 
 
