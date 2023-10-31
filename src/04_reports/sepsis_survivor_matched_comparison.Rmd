@@ -51,7 +51,8 @@ survivor_cohort %>%
 
 ```{r}
 survivor_cohort <- survivor_cohort %>% 
-  mutate(cohort = str_to_title(cohort))
+  mutate(cohort = str_to_title(cohort)) %>% 
+  mutate(cohort = ifelse(cohort == "Sepsis", cohort, "Comparison"))
 
 g1 <- survfit2(Surv(time_nave, cens_nave) ~ cohort, data = survivor_cohort) %>% 
   ggsurvfit(type = "risk") +
