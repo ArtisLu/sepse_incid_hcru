@@ -40,6 +40,20 @@ spec_codes <- read_xlsx("taskfiles/raw/AM_specialitasu_klasifikators_LP_JB.xlsx"
 spec_codes <- spec_codes %>% 
   mutate(tips = ifelse(tips == "rehabilitation", "other_care_manipulations", tips))
 
+# apvieno other manipulations un other diagnostics
+spec_codes <- spec_codes %>% 
+  mutate(tips = ifelse(tips %in% c("other_care_manipulations", "other_diagnostics"), "ohter_diagnostics_manipulations", tips))
+
+# -------------------------------------------------------------------------
+# Pārveido NA summas uz 0
+# -------------------------------------------------------------------------
+# stac <- stac %>% 
+#   mutate(across(contains("summa"), ~replace_na(., 0)))
+# 
+# ambul <- ambul %>% 
+#   mutate(across(contains("summa"), ~replace_na(., 0))) %>% 
+#   mutate(across(contains("iemaksa"), ~replace_na(., 0)))
+
 #--------------------------------------------------------------------
 # Definē hospitalizāciju raksturojošos parametrus
 #--------------------------------------------------------------------
@@ -136,13 +150,14 @@ rehosp <- stac %>%
 rehosp <- rehosp %>% 
   mutate(hosp_ilgums = as.integer(date2 - date1)) %>% 
   mutate(summa_pac = ifelse(year(date1) < 2015, 14 * hosp_ilgums, 10 * hosp_ilgums)) %>% # pacienta iemaksa, Jura epasts
-  mutate(summa_total = summa + summa_pac) %>% 
+  # count(is.na(summa_pac), is.na(summa))
+  mutate(summa_total = rowSums(across(c("summa", "summa_pac")), na.rm = TRUE)) %>% 
   group_by(pid) %>% 
   summarise(
     first_rehosp_date = min(date1),
     nb_hospitalizations = n(),
-    hospital_nights = sum(hosp_ilgums),
-    rehosp_summa = sum(summa_total)
+    hospital_nights = sum(hosp_ilgums, na.rm = TRUE),
+    rehosp_summa = sum(summa_total, na.rm = TRUE)
   )
 
 # pievieno kohortai
@@ -175,10 +190,6 @@ visits <- visits %>%
   left_join(spec_codes) %>% 
   drop_na(tips)
 
-# apvieno other manipulations un other diagnostics
-visits <- visits %>% 
-  mutate(tips = ifelse(tips %in% c("other_care_manipulations", "other_diagnostics"), "ohter_diagnostics_manipulations", tips))
-
 # apkopu pēc pid un tipa
 visits_aggr <- visits %>% 
   mutate(across(contains("summa"), ~as.numeric(.))) %>% 
@@ -189,11 +200,14 @@ visits_aggr <- visits %>%
     summa_epiz = sum(summa_epizodes, na.rm = TRUE),
     summa_manip = sum(summa_manipulacijas, na.rm = TRUE),
     summa_pac_iemaks_pac = sum(pacienta_iemaksa_no_pacienta, na.rm = TRUE),
-    summa_pac_iemaks_valsts = sum(pacienta_iemaksa_no_valsts, na.rm = TRUE),
-    summa_kopa = summa_epiz + summa_manip + summa_pac_iemaks_pac + summa_pac_iemaks_valsts
+    summa_pac_iemaks_valsts = sum(pacienta_iemaksa_no_valsts, na.rm = TRUE)
   ) %>% 
-  select(pid, tips, skaits, summa_kopa) %>% 
-  ungroup()
+  ungroup() %>% 
+  mutate(
+    summa_kopa = rowSums(across(c("summa_epiz", "summa_manip", "summa_pac_iemaks_pac", "summa_pac_iemaks_valsts")), na.rm = TRUE)) %>% 
+  # count(is.na(summa_epiz), is.na(summa_manip), is.na(summa_pac_iemaks_pac), is.na(summa_pac_iemaks_valsts), is.na(summa_kopa)) %>% 
+  # View()
+  select(pid, tips, skaits, summa_kopa) 
 
 visits_aggr_wide <- crossing(cohort_analysis %>% select(pid), spec_codes %>% select(tips)) %>% 
   left_join(visits_aggr) %>% 
@@ -204,16 +218,33 @@ visits_aggr_wide <- crossing(cohort_analysis %>% select(pid), spec_codes %>% sel
   mutate(var = gsub("_kopa", "", var)) %>% 
   mutate(tips = paste0(tips, "_", var)) %>% 
   select(-var) %>% 
-  pivot_wider(names_from = tips, values_from = value) 
-  
+  pivot_wider(names_from = tips, values_from = value) %>% 
+  mutate(
+    outpatient_summa = rowSums(
+      across(
+        c(
+          "primary_care_physician_visits_summa",
+          "specialists_visits_summa",
+          "ohter_diagnostics_manipulations_summa",
+          "laboratory_diagnostics_summa"
+        )),
+      na.rm = TRUE
+    )
+  ) %>% 
+  mutate(
+    outpatient_summa = ifelse(
+      is.na(primary_care_physician_visits_summa) & is.na(specialists_visits_summa) & is.na(ohter_diagnostics_manipulations_summa) & is.na(laboratory_diagnostics_summa),
+      NA,
+      outpatient_summa
+    )
+  )
 
 cohort_analysis <- cohort_analysis %>% left_join(visits_aggr_wide)
 
 # Definē utilization intensity
 cohort_analysis <- cohort_analysis %>% 
-  mutate(utilization_intensity = hosp_ilgums + primary_care_physician_visits_skaits + specialists_visits_skaits +ohter_diagnostics_manipulations_skaits) %>% 
-  mutate(outpatient_skaits = utilization_intensity - hosp_ilgums) %>% 
-  mutate(outpatient_summa = primary_care_physician_visits_summa + specialists_visits_summa + ohter_diagnostics_manipulations_summa)
+  mutate(utilization_intensity = hosp_ilgums + primary_care_physician_visits_skaits + specialists_visits_skaits +ohter_diagnostics_manipulations_skaits + laboratory_diagnostics_skaits) %>% 
+  mutate(outpatient_skaits = utilization_intensity - hosp_ilgums)
 
 # Receptes ----------------------------------------------------------------
 drugs <- komp_med %>% 
@@ -227,10 +258,10 @@ drug_aggr <- drugs %>%
   group_by(pid) %>% 
   summarise(
     skaits = n(),
-    summa_valsts = sum(valsts_summa),
-    summa_pac = sum(pacienta_lidzmaksajums),
-    summa_kopa = summa_valsts + summa_pac
+    summa_valsts = sum(valsts_summa, na.rm = TRUE),
+    summa_pac = sum(pacienta_lidzmaksajums, na.rm = TRUE)
   ) %>% 
+  mutate(summa_kopa = rowSums(across(c("summa_valsts", "summa_pac")), na.rm = TRUE)) %>% 
   select(pid, receptes_skaits = skaits, receptes_summa = summa_kopa)
 
 cohort_analysis <- cohort_analysis %>% 
