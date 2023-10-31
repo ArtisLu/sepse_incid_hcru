@@ -42,6 +42,7 @@ survivor_cohort %>%
   # glimpse()
   tbl_summary(by = cohort) %>% 
   bold_labels() %>% 
+  add_difference(everything() ~ "smd") %>% 
   add_p()
 ```
 
