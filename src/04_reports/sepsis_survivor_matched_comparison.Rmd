@@ -37,6 +37,7 @@ survivor_cohort %>%
   select(-pid, -nave_date, -obs_date_nave, -time_nave, -first_rehosp_date, -obs_date_rehosp, -time_rehosp) %>% 
   # select(vecums:aids, cohort) %>% 
   mutate(cohort = fct_relevel(cohort, c("sepsis", "control"))) %>% 
+  mutate(izrakst_gads = ifelse(izrakst_gads == "2020", NA, izrakst_gads)) %>% 
   mutate(across(mi:aids, ~ifelse(. == 0, FALSE, TRUE))) %>% 
   # glimpse()
   tbl_summary(by = cohort) %>% 
